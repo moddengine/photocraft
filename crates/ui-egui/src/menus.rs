@@ -213,14 +213,16 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
             Ok(json!({"dialog": d}))
         }
         "file.open" => {
-            if let Some(path) = params.get("path").and_then(Value::as_str) {
-                open_path(app, path)
-            } else {
-                app.open_dialog_file()
+            if app.services.host_persist.is_some() && app.has_unsaved_work() {
+                return Err("Save or close unsaved documents before choosing another CMS asset".into());
             }
+            if let Some(path) = params.get("path").and_then(Value::as_str) { open_path(app, path) } else { app.open_dialog_file() }
         }
         "file.import.videoFramesToLayers" if params.get("path").and_then(Value::as_str).is_none() => {
             app.ask_folder(|app, path| app.run("file.import.videoFramesToLayers", json!({"path": path})).map_err(|e| e.to_string()))
+        }
+        "file.save" | "file.saveAs" if app.services.host_persist.is_some() && !app.automation_input => {
+            app.save_to_host(if id == "file.save" { crate::host_files::Action::Save } else { crate::host_files::Action::SaveAs })
         }
         "file.save" => {
             // Writes back only to a layered file that holds the whole document; anything else

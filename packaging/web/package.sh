@@ -76,6 +76,8 @@ echo "$(basename "$WASM"): $wasm_bytes bytes ($((wasm_bytes / 1048576)) MiB), sh
 # Sample server configs (MIME type, caching, compression); harmless where unused.
 cp "$HERE/_headers" "$HERE/.htaccess" "$WORK/$NAME/"
 cp "$HERE/README.md" "$WORK/$NAME/HOSTING.md"
+mkdir -p "$WORK/$NAME/docs"
+cp "$ROOT/docs/web-cms-integration.md" "$WORK/$NAME/docs/web-cms-integration.md"
 copy_docs "$WORK/$NAME"
 # Optional served fonts (README.md › Fonts): PHOTOCRAFT_WEB_FONTS_DIR=<a craft-fonts checkout, or any
 # folder with a fonts/manifest.txt in its format> copies the manifest, every font and licence file

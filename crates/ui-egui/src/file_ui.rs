@@ -704,6 +704,9 @@ fn save_for_web(app: &mut PhotocraftApp, p: Value) -> Result<Value, String> {
         app.ui.status_error = true;
     })?;
     app.sync_views();
+    if r.get("pending").and_then(Value::as_bool) == Some(true) {
+        return Ok(r);
+    }
     app.ui.status =
         crate::i18n::trn(crate::i18n::current(), r["files"].as_array().map_or(0, Vec::len) as u64, "Saved for Web: {n} file", "Saved for Web: {n} files");
     app.ui.status_error = false;
@@ -715,6 +718,19 @@ fn download_for_web(app: &mut PhotocraftApp, mut p: Value) -> Result<Value, Stri
     // Browser downloads have no directory hierarchy. Keep the HTML's image and spacer URLs
     // beside the downloaded page, matching the names handed to the platform service.
     p["imagesFolder"] = json!("");
+    if app.services.host_persist.is_some() {
+        let mut files = Vec::new();
+        let mut result = web_cmds::save_for_web_with_writer(&mut app.session, &p, &mut |path, bytes| {
+            files.push((path.to_string(), bytes.to_vec()));
+            Ok(())
+        })
+        .map_err(|e| e.to_string())?;
+        for (path, bytes) in files {
+            app.export_to_host(&path, &bytes, &[])?;
+        }
+        result["pending"] = json!(true);
+        return Ok(result);
+    }
     let write = app.services.write.as_mut().ok_or("no download service")?;
     web_cmds::save_for_web_with_writer(&mut app.session, &p, &mut |path, bytes| write(path, bytes).map_err(photocraft_engine::EngineError::Other))
         .map_err(|e| e.to_string())

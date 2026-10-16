@@ -593,3 +593,6 @@ backend command without submitting; it writes a PDF only when `output` is explic
 without an output requires `dryRun: true`. Remembered print settings omit `output`, `dryRun` and
 `send`, so Print One Copy derives submission from its own output choice. Shared spooler transport
 files are automatically removed on Windows; CUPS needs none.
+
+CMS media selection, persistence hooks, initial loading and the opt-in iframe adapter are
+documented in [Web CMS integration](web-cms-integration.md). Standalone behavior is unchanged.

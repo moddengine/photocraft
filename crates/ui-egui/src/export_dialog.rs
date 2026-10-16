@@ -172,10 +172,17 @@ pub fn quick_export_selected_layers_png(app: &mut PhotocraftApp) -> Result<Value
         for (doc, path) in docs.iter().zip(paths) {
             let export = app.services.export.as_ref().ok_or("no exporter configured")?;
             let (bytes, warnings) = export(doc, &path, &ExportSettings { xmp_all: false, ..Default::default() })?;
+            if app.export_to_host(&path, &bytes, &warnings)? {
+                exported.push(json!({"path": path, "pending": true}));
+                continue;
+            }
             let write = app.services.write.as_mut().ok_or("no writer configured")?;
             write(&path, &bytes)?;
             crate::notices::io_warnings(app, &format!("Exported {}", crate::file_open::display_name(&path)), &warnings);
             exported.push(json!({"path": path, "bytes": bytes.len(), "warnings": warnings}));
+        }
+        if app.services.host_persist.is_some() {
+            return Ok(json!({"files": exported, "pending": true}));
         }
         app.ui.status = format!("Exported {} PNG files", exported.len());
         app.ui.status_error = false;
@@ -853,6 +860,9 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
         let out = export_document(&doc, &f, None)?;
         let export = app.services.export.as_ref().ok_or("no exporter configured")?;
         let (bytes, warnings) = export(&out, &path, &settings)?;
+        if app.export_to_host(&path, &bytes, &warnings)? {
+            return Ok(json!({"path": path, "pending": true}));
+        }
         let write = app.services.write.as_mut().ok_or("no writer configured")?;
         write(&path, &bytes)?;
         let template = "Exported {path} ({size})";
@@ -884,12 +894,19 @@ fn confirm_layers(app: &mut PhotocraftApp, f: &Map<String, Value>, ids: &[photoc
             let out = export_document(doc, &f, None)?;
             let export = app.services.export.as_ref().ok_or("no exporter configured")?;
             let (bytes, warnings) = export(&out, &path, &settings)?;
+            if app.export_to_host(&path, &bytes, &warnings)? {
+                exported.push(json!({"path": path, "pending": true}));
+                continue;
+            }
             let write = app.services.write.as_mut().ok_or("no writer configured")?;
             write(&path, &bytes)?;
             let template = "Exported {path}";
             let what = crate::i18n::fmt(tl!(template), &[("path", &crate::file_open::display_name(&path))]);
             crate::notices::io_warnings(app, &what, &warnings);
             exported.push(json!({"path": path, "bytes": bytes.len(), "warnings": warnings}));
+        }
+        if app.services.host_persist.is_some() {
+            return Ok(json!({"files": exported, "pending": true}));
         }
         let template = "Exported {n} files";
         app.ui.status = crate::i18n::fmt(tl!(template), &[("n", &exported.len().to_string())]);

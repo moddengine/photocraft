@@ -221,3 +221,6 @@ PhotoCraft renders with wgpu. It uses **WebGPU** when the browser has it and fal
 For example: `<iframe src="https://example.com/photocraft/?webgl" ...>`.
 
 A browser with neither WebGPU nor WebGL2 gets a message in place of the app.
+
+CMS media selection, persistence hooks, initial loading and the opt-in iframe adapter are
+documented in `docs/web-cms-integration.md` in the source checkout and in the package. Standalone behavior is unchanged.

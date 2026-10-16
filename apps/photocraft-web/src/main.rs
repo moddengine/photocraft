@@ -26,6 +26,12 @@ mod indexed_presets;
 mod web;
 
 #[cfg(target_arch = "wasm32")]
+mod host;
+
+#[cfg(any(target_arch = "wasm32", test))]
+mod iframe;
+
+#[cfg(target_arch = "wasm32")]
 fn main() {
     web::start();
 }

@@ -106,6 +106,7 @@ pub mod gradient_ui;
 pub mod guide_layout_ui;
 pub mod guide_select;
 pub mod hold_keys;
+pub mod host_files;
 pub mod i18n;
 mod icon_data;
 pub mod icons;
@@ -457,6 +458,8 @@ pub type CaptionStyleFn = Box<dyn Fn(&egui::Context) -> CaptionStyle>;
 /// I/O dependencies.
 #[derive(Default)]
 pub struct Services {
+    /// Optional asynchronous CMS persistence; absent for local files and downloads.
+    pub host_persist: Option<host_files::PersistFn>,
     /// User-initiated desktop/browser pixel sampling.
     pub screen_pick: Option<screen_picker::Service>,
     /// Decode a file's bytes into a document (PSD, PNG, JPEG, …).
@@ -569,6 +572,8 @@ pub(crate) type HistJob = (DocId, u64, std::sync::mpsc::Receiver<(DocId, f64, st
 type InfoSampleKey = (i32, i32, u64, u32);
 
 pub struct PhotocraftApp {
+    host_writes: Vec<host_files::Pending>,
+    host_open: Option<host_files::Opening>,
     pub session: Session,
     pub ui: UiState,
     pub services: Services,
@@ -880,6 +885,8 @@ impl PhotocraftApp {
             trail: None,
             remove_pending: Vec::new(),
             remove_pending_target: None,
+            host_writes: Vec::new(),
+            host_open: None,
             remove_trail: None,
             menu_cache: None,
             move_preview: None,
@@ -1748,7 +1755,7 @@ impl PhotocraftApp {
 
     /// A save is running in the background.
     pub(crate) fn saving(&self) -> bool {
-        !self.jobs.saves.is_empty()
+        !self.jobs.saves.is_empty() || self.host_writes.iter().any(|p| p.save.is_some())
     }
 
     /// Save through the control session's capability-scoped writer. No file
@@ -1921,6 +1928,8 @@ impl eframe::App for PhotocraftApp {
         self.collect_screenshots(ctx);
         self.issue_screenshots(ctx);
         prefs_ui::tick(self, ctx);
+        self.poll_host_writes(ctx);
+        self.poll_host_open();
         monitor_status::poll_frame(self, ctx, frame);
         // Control requests and persisted preferences can change the language in this frame.
         i18n::sync_context(ctx, &self.session.prefs().interface.language);

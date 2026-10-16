@@ -45,12 +45,19 @@ type Served = Arc<Mutex<ServedFonts>>;
 
 pub fn start() {
     eframe::WebLogger::init(log::LevelFilter::Info).ok();
+    if let Err(e) = crate::host::publish() {
+        crate::host::started(Err(format!("Could not publish editor API: {e:?}")));
+        log::error!("Could not publish editor API: {e:?}");
+        return;
+    }
     wasm_bindgen_futures::spawn_local(async {
         let Some(document) = web_sys::window().and_then(|w| w.document()) else {
+            crate::host::started(Err("PhotoCraft needs a browser document".into()));
             log::error!("no document");
             return;
         };
         let Some(canvas) = document.get_element_by_id(CANVAS_ID).and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok()) else {
+            crate::host::started(Err(format!("Missing canvas #{CANVAS_ID}; check the editor page")));
             log::error!("missing <canvas id=\"{CANVAS_ID}\">");
             return;
         };
@@ -88,6 +95,7 @@ pub fn start() {
                     preset_warnings.extend(warnings);
                     let drag = listen_drag(&pen_target);
                     let mut app = PhotocraftApp::new(session, services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag)));
+                    crate::host::attach(cc.egui_ctx.clone());
                     if !preset_warnings.is_empty() {
                         photocraft_ui_egui::notices::post(&mut app, i18n::t("Some brush presets could not be loaded"), preset_warnings, true, None);
                     }
@@ -105,6 +113,7 @@ pub fn start() {
                 }),
             )
             .await;
+        crate::host::started(result.as_ref().map(|_| ()).map_err(|e| format!("PhotoCraft could not start: {e:?}")));
         if let Some(el) = document.get_element_by_id("photocraft_loading") {
             match result {
                 Ok(()) => el.remove(),
@@ -323,6 +332,17 @@ impl WebShell {
 
 impl eframe::App for WebShell {
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        if crate::host::configured() && self.app.services.host_persist.is_none() {
+            let wake = ctx.clone();
+            self.app.services.host_persist = Some(Box::new(move |name, bytes, action, reply| {
+                let wake = wake.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let _ = reply.send(crate::host::save(name, bytes, action).await);
+                    wake.request_repaint();
+                });
+            }));
+        }
+        crate::host::poll(&mut self.app);
         let dropped = ctx.input_mut(|i| std::mem::take(&mut i.raw.dropped_files));
         if !dropped.is_empty() {
             let names: Vec<String> =
@@ -394,6 +414,15 @@ fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::Cu
             // The browser's file picker hands over the files' contents, not paths. File › Open
             // asks for several files (`multiple`), each opened in its own tab.
             FileDialogRequest::Open { multiple, extensions, .. } => wasm_bindgen_futures::spawn_local(async move {
+                if multiple && extensions.is_none() && crate::host::configured() {
+                    let answer = match crate::host::open().await {
+                        Ok(Some((name, bytes))) => Some(FileDialogAnswer::Contents(name, bytes)),
+                        Ok(None) => None,
+                        Err(e) => Some(FileDialogAnswer::Unavailable(format!("CMS media picker failed: {e}"))),
+                    };
+                    reply.send(answer);
+                    return;
+                }
                 let dialog = if let Some(exts) = extensions {
                     rfd::AsyncFileDialog::new().add_filter("Supported Files", &exts)
                 } else {
