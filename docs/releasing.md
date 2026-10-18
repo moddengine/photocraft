@@ -1,5 +1,21 @@
 # Releasing PhotoCraft
 
+## ModdEngine CMS web releases
+
+The ModdEngine fork builds its browser bundle independently of the signed desktop releases.
+Push a tag such as `moddengine-web-v0.10.0-cms.1` on the CMS integration commit to run
+`.github/workflows/moddengine-web-release.yml`. Use a new `cms` number for each release;
+published releases are never replaced. The workflow builds the app and boot loader with the
+locked Rust dependencies, runs the existing web packaging checks, and publishes a prerelease
+containing `photocraft-web-0.10.0-cms.1.zip` and `SHA256SUMS.txt`. It needs no desktop signing
+secrets. Consumers should pin both the release tag and the zip's SHA-256.
+
+This bundle contains the `window.PhotoCraft` CMS hooks documented in
+[web-cms-integration.md](web-cms-integration.md). The CMS decides which formats to upload and
+which to download locally; the editor still performs all encoding and decoding.
+
+## Upstream releases
+
 Every push to the `release` branch runs `.github/workflows/release.yml`. The workflow builds
 signed installers for macOS, Windows, Linux and the web, plus a FreeBSD tarball, then creates
 or updates a **draft** GitHub Release named `PhotoCraft v<version>`. Nobody sees a draft until a
@@ -20,6 +36,7 @@ and ids stay lowercase (`photocraft-<version>-<platform>-<arch>.<ext>`, `ai.stor
    ```
 
    Commit the change (`Cargo.toml` + `Cargo.lock`) through the normal review flow.
+
 2. **Merge `main` into `release`** (or fast-forward it) and push. The workflow starts by itself.
 3. **Wait for the draft.** After about 30 to 45 minutes (notarization is the slow part), the
    Releases page has a draft `PhotoCraft v0.2.0`, tagged `v0.2.0` on the pushed commit, with
@@ -38,7 +55,7 @@ and ids stay lowercase (`photocraft-<version>-<platform>-<arch>.<ext>`, `ai.stor
 Pushing to `release` again before you publish rebuilds the same draft and replaces its assets.
 After the draft is published, the workflow refuses to touch that version again, so bump it first.
 
-**Test runs:** *Actions → Release → Run workflow* runs the whole pipeline by hand. The optional
+**Test runs:** _Actions → Release → Run workflow_ runs the whole pipeline by hand. The optional
 `version` input (such as `0.2.0-rc.1`) overrides `Cargo.toml` for that run only. The jobs apply
 it with `cargo xtask version set` before building, so the binaries report it too. The run still
 needs the `release` environment, which only the `release` branch can use, so pick that branch
@@ -46,19 +63,19 @@ in the dialog.
 
 ## What gets built
 
-| Platform | Artifacts | Built on |
-|---|---|---|
-| macOS 11+ (universal: Apple silicon + Intel) | `photocraft-<v>-macos-universal.dmg`, `photocraft-cli-<v>-macos-universal.zip` | `macos-15` |
-| Windows 10+ x64 | `photocraft-<v>-windows-x64.msi`, `photocraft-<v>-windows-x64-portable.zip` | `windows-latest` |
-| Windows 10+ x86 (32-bit) | `photocraft-<v>-windows-x86.msi`, `photocraft-<v>-windows-x86-portable.zip` | `windows-latest` |
-| Linux x86_64 | `photocraft-<v>-linux-x86_64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}` | `ubuntu-22.04` (Flatpak: `ubuntu-24.04`) |
-| Linux aarch64 | `photocraft-<v>-linux-aarch64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}` | `ubuntu-22.04-arm` (Flatpak: `ubuntu-24.04-arm`) |
-| Linux riscv64 (glibc 2.39+) | `photocraft-<v>-linux-riscv64.tar.gz` | cross-compiled on `ubuntu-24.04` (ports.ubuntu.com riscv64 libs); CLI smoke-tested under QEMU |
-| FreeBSD 14 x86_64 | `photocraft-<v>-freebsd-x86_64.tar.gz` | FreeBSD 14.3 VM on `ubuntu-latest` |
-| Web | `photocraft-web-<v>.zip` (static site; see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
+| Platform                                     | Artifacts                                                                                           | Built on                                                                                      |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| macOS 11+ (universal: Apple silicon + Intel) | `photocraft-<v>-macos-universal.dmg`, `photocraft-cli-<v>-macos-universal.zip`                      | `macos-15`                                                                                    |
+| Windows 10+ x64                              | `photocraft-<v>-windows-x64.msi`, `photocraft-<v>-windows-x64-portable.zip`                         | `windows-latest`                                                                              |
+| Windows 10+ x86 (32-bit)                     | `photocraft-<v>-windows-x86.msi`, `photocraft-<v>-windows-x86-portable.zip`                         | `windows-latest`                                                                              |
+| Linux x86_64                                 | `photocraft-<v>-linux-x86_64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}`                      | `ubuntu-22.04` (Flatpak: `ubuntu-24.04`)                                                      |
+| Linux aarch64                                | `photocraft-<v>-linux-aarch64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}`                     | `ubuntu-22.04-arm` (Flatpak: `ubuntu-24.04-arm`)                                              |
+| Linux riscv64 (glibc 2.39+)                  | `photocraft-<v>-linux-riscv64.tar.gz`                                                               | cross-compiled on `ubuntu-24.04` (ports.ubuntu.com riscv64 libs); CLI smoke-tested under QEMU |
+| FreeBSD 14 x86_64                            | `photocraft-<v>-freebsd-x86_64.tar.gz`                                                              | FreeBSD 14.3 VM on `ubuntu-latest`                                                            |
+| Web                                          | `photocraft-web-<v>.zip` (static site; see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest`                                                                               |
 
 Every binary reports its version, the commit and the build date: `photocraft --version`,
-`photocraft-cli --version`, and *Help › About PhotoCraft*. CI sets `PHOTOCRAFT_BUILD_SHA` and
+`photocraft-cli --version`, and _Help › About PhotoCraft_. CI sets `PHOTOCRAFT_BUILD_SHA` and
 `PHOTOCRAFT_BUILD_DATE`, and `crates/engine/src/build_info.rs` reads them at compile time. A plain
 `cargo build` doesn't set them and reports `0.2.0 (dev build)`.
 
@@ -195,16 +212,16 @@ Why these formats:
   the next release and download only the blocks that changed.
   Its `AppRun` (`packaging/linux/AppRun`) also integrates with the desktop on launch: on
   Wayland the dock icon comes from the compositor resolving the window's app_id against an
-  *installed* `.desktop` file, which an AppImage alone never provides — without this every
+  _installed_ `.desktop` file, which an AppImage alone never provides — without this every
   AppImage run shows the generic Wayland logo (#593). Best effort: it installs
   `~/.local/share/applications/ai.storyteller.photocraft.desktop` with `Exec` rewritten to
   the AppImage's path (`TryExec` dropped, the binary isn't on the host PATH) and the
   hicolor icons beside it, rewriting only when the content changed, and any failure leaves
   the launch untouched. `PHOTOCRAFT_NO_DESKTOP_INTEGRATION=1` opts out; to uninstall, `rm
-  ~/.local/share/applications/ai.storyteller.photocraft.desktop` and `find
-  ~/.local/share/icons/hicolor -name 'ai.storyteller.photocraft*' -delete`. The script is
+~/.local/share/applications/ai.storyteller.photocraft.desktop` and `find
+~/.local/share/icons/hicolor -name 'ai.storyteller.photocraft*' -delete`. The script is
   covered by `packaging/linux/apprun-test.sh` in the packaging-lint workflow.
-- **.deb** covers Debian, Ubuntu, Mint, Pop!_OS and elementary. **.rpm** covers Fedora, RHEL
+- **.deb** covers Debian, Ubuntu, Mint, Pop!\_OS and elementary. **.rpm** covers Fedora, RHEL
   and its clones, and openSUSE. Both integrate with the menu, MIME and icon caches (the
   `postinst.sh` hook) and uninstall cleanly. Both are built by
   [nfpm](https://nfpm.goreleaser.com/): one maintained, dependency-free tool and one config
@@ -234,6 +251,7 @@ Why these formats:
   `flatpak override --user --share=network ai.storyteller.photocraft`. Host fonts are read from
   `/run/host/fonts` and `/run/host/user-fonts`. Locally (on Linux, with `flatpak` and
   `flatpak-builder`): `packaging/linux/package.sh --formats tar && packaging/linux/flatpak-bundle.sh`.
+
 - **Flathub**: `packaging/linux/flatpak/ai.storyteller.photocraft.yml` builds from source and
   is ready for a Flathub submission (it keeps the same runtime and `finish-args` as the bundle
   manifest, which packaging-lint checks). CI doesn't build it. A real build needs vendored crate
@@ -297,25 +315,25 @@ caching, the iframe snippet and the `?webgl` / `?cpu` flags.
 
 ## Secrets
 
-All secrets live in the repository's **`release` environment** (*Settings → Environments →
-release*). Restrict its deployment branches to `release`. Every job in `release.yml` that
+All secrets live in the repository's **`release` environment** (_Settings → Environments →
+release_). Restrict its deployment branches to `release`. Every job in `release.yml` that
 signs or publishes declares `environment: release` (the Flatpak and FreeBSD jobs sign nothing
 and don't), so only pushes to that branch, or manual runs on it, can read the secrets. Each secret is optional. If one is missing, that platform's artifacts are unsigned and
 the run shows a `::warning::`.
 
-| Secret | Used for |
-|---|---|
-| `APPLE_CERTIFICATE` | base64 `.p12` with "Developer ID Application: Learning Machines LLC (DJ6XS33FX8)" |
-| `APPLE_CERTIFICATE_PASSWORD` | password for that `.p12` |
-| `KEYCHAIN_PASSWORD` | password for the temporary CI keychain (random if unset) |
-| `APPLE_ID` | Apple ID used by `notarytool` |
-| `APPLE_PASSWORD` | app-specific password for that Apple ID |
-| `APPLE_TEAM_ID` | `DJ6XS33FX8` |
-| `WINDOWS_CERTIFICATE` | base64 `.pfx` code-signing certificate |
-| `WINDOWS_CERTIFICATE_PASSWORD` | password for that `.pfx` |
-| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | service principal for Azure Trusted Signing (an alternative to the `.pfx`) |
-| `AZURE_SIGNING_ENDPOINT` | e.g. `https://eus.codesigning.azure.net` |
-| `AZURE_SIGNING_ACCOUNT`, `AZURE_CERT_PROFILE` | Trusted Signing account and certificate profile names |
+| Secret                                                      | Used for                                                                          |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `APPLE_CERTIFICATE`                                         | base64 `.p12` with "Developer ID Application: Learning Machines LLC (DJ6XS33FX8)" |
+| `APPLE_CERTIFICATE_PASSWORD`                                | password for that `.p12`                                                          |
+| `KEYCHAIN_PASSWORD`                                         | password for the temporary CI keychain (random if unset)                          |
+| `APPLE_ID`                                                  | Apple ID used by `notarytool`                                                     |
+| `APPLE_PASSWORD`                                            | app-specific password for that Apple ID                                           |
+| `APPLE_TEAM_ID`                                             | `DJ6XS33FX8`                                                                      |
+| `WINDOWS_CERTIFICATE`                                       | base64 `.pfx` code-signing certificate                                            |
+| `WINDOWS_CERTIFICATE_PASSWORD`                              | password for that `.pfx`                                                          |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | service principal for Azure Trusted Signing (an alternative to the `.pfx`)        |
+| `AZURE_SIGNING_ENDPOINT`                                    | e.g. `https://eus.codesigning.azure.net`                                          |
+| `AZURE_SIGNING_ACCOUNT`, `AZURE_CERT_PROFILE`               | Trusted Signing account and certificate profile names                             |
 
 `GITHUB_TOKEN` creates the release. Only the final job gets `contents: write`.
 

@@ -1,0 +1,84 @@
+name: ModdEngine web release
+
+on:
+  push:
+    tags: [moddengine-web-v*]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: moddengine-web-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  web:
+    if: github.repository == 'moddengine/photocraft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      TRUNK_VERSION: 0.21.14
+      CARGO_INCREMENTAL: 0
+      CARGO_BUILD_JOBS: 2
+      CARGO_PROFILE_WASM_RELEASE_LTO: thin
+      PHOTOCRAFT_BUILD_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate fork release tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^moddengine-web-v[0-9]+\.[0-9]+\.[0-9]+-cms\.[0-9]+$ ]]; then
+            echo 'Expected moddengine-web-v<version>-cms.<number>' >&2
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo 'This tag already has a release; publish a new tag instead.' >&2
+            exit 1
+          fi
+          echo "PHOTOCRAFT_VERSION=${TAG#moddengine-web-v}" >> "$GITHUB_ENV"
+          echo "PHOTOCRAFT_BUILD_DATE=$(date -u +%F)" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: moddengine-web
+          cache-on-failure: true
+      - name: Install Trunk
+        run: |
+          asset=trunk-x86_64-unknown-linux-musl.tar.gz
+          url="https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}"
+          curl -fsSL --retry 3 "$url/$asset" -o "$RUNNER_TEMP/$asset"
+          curl -fsSL --retry 3 "$url/$asset.sha256" -o "$RUNNER_TEMP/$asset.sha256"
+          cd "$RUNNER_TEMP"
+          printf '%s  %s\n' "$(cat "$asset.sha256")" "$asset" | sha256sum -c -
+          tar -xzf "$asset" -C "$HOME/.cargo/bin" trunk
+          trunk --version
+      - name: Build locked web application and loader
+        run: |
+          (cd apps/photocraft-web && trunk build --release --locked)
+          (cd apps/photocraft-web-boot && trunk build --release --locked)
+          packaging/web/package.sh --skip-build
+      - name: Check bundle and write checksum
+        run: |
+          cd dist/release
+          bundle="photocraft-web-${PHOTOCRAFT_VERSION}.zip"
+          unzip -t "$bundle"
+          sha256sum "$bundle" > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moddengine-photocraft-web
+          path: dist/release/*
+          if-no-files-found: error
+      - name: Publish fork web bundle
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/release/* \
+            --verify-tag --prerelease --latest=false \
+            --title "PhotoCraft ${PHOTOCRAFT_VERSION} (ModdEngine CMS)" \
+            --notes "Web-only build of the ModdEngine CMS integration fork. Includes the static editor, JavaScript loader, WebAssembly, hosting instructions and CMS API documentation. Extract the zip and serve its contents together. SHA256SUMS.txt verifies the download."
