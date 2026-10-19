@@ -20,6 +20,7 @@ the readiness promise). Do not initialize a second copy of the wasm module.
 type EditorFile = { name: string; bytes: Uint8Array };
 type HostIntegration = {
   open(): Promise<EditorFile | null>;
+  close?(): void;
   save(file: EditorFile, action: "save" | "saveAs" | "export"): Promise<void>;
 };
 PhotoCraft.setHostIntegration(hooks: HostIntegration): void;
@@ -37,6 +38,7 @@ extension. Preset files are not documents.
 
 - **Open** calls `open()` once. Returning `null` cancels without changing the document. A rejected
   promise reports a picker error. Other pickers, such as Import Brushes, retain their local behavior.
+- **Exit** calls the optional `close()` hook after the editor's unsaved-work prompts and pending saves finish. Embedded hosts should close their editor dialog here; standalone browser tabs must be closed by the user.
 - **Save** sends a `.pcraft` native editable document with action `save`, preserving supported
   layers, masks, effects and document data. Store it as the asset's editable source; its filename
   and MIME type may differ from the originally selected JPEG/PNG. PhotoCraft does not overwrite

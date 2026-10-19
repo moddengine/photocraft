@@ -1289,7 +1289,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
         },
         "app.quit" => {
             app.allow_close = true;
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            crate::discard_ui::request_exit(app, ctx);
             ok(Value::Null)
         }
         other => err(format!("unknown method `{other}`")),

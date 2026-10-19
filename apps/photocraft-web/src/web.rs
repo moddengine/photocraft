@@ -464,6 +464,11 @@ fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::Cu
         })),
         inbox: Some(inbox),
         place_inbox: Some(place_inbox),
+        quit: Some(Box::new(|| {
+            if let Err(error) = crate::host::close() {
+                log::warn!("Could not close PhotoCraft: {error:?}");
+            }
+        })),
         cursor_pos: Some(cursor_pos),
         // Preferences live in the browser's localStorage.
         load_prefs: Some(Box::new(|| local_storage()?.get_item(PREFS_KEY).ok().flatten())),

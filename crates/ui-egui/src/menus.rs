@@ -256,7 +256,7 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
             }
         }
         "file.exit" => {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            crate::discard_ui::request_exit(app, ctx);
             Ok(Value::Null)
         }
         "file.clearRecent" => {
