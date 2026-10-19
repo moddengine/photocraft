@@ -349,7 +349,10 @@ fn finish_save(app: &mut PhotocraftApp, ctx: &egui::Context, save: SaveJob, labe
 fn close_after_saves(app: &mut PhotocraftApp, ctx: &egui::Context) {
     app.jobs.saves.retain(|s| !(s.ended && s.state.finished()));
     if !app.saving() && !app.printing() && std::mem::take(&mut app.jobs.close_after_saves) {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        if !app.allow_close && crate::discard_ui::intercept(app, "file.exit", &serde_json::Value::Null) {
+            return;
+        }
+        crate::discard_ui::request_exit(app, ctx);
     }
 }
 

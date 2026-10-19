@@ -181,6 +181,12 @@ pub async fn open() -> Result<Option<(String, Vec<u8>)>, String> {
     if file.is_null() { Ok(None) } else { read_file(&file).map(Some).map_err(error) }
 }
 
+pub fn close() -> Result<(), JsValue> {
+    let hooks = BRIDGE.with_borrow(|b| b.hooks.clone()).ok_or_else(|| JsValue::from_str("Close this browser tab to exit PhotoCraft"))?;
+    let callback = Reflect::get(&hooks, &"close".into())?.dyn_into::<Function>().map_err(|_| JsValue::from_str("The CMS has not configured close()"))?;
+    callback.call0(&hooks).map(|_| ())
+}
+
 pub async fn save(name: String, bytes: Vec<u8>, action: Action) -> Result<(), String> {
     let hooks = BRIDGE.with_borrow(|b| b.hooks.clone()).ok_or("Host integration is not configured")?;
     let file = js_sys::Object::new();
@@ -199,6 +205,23 @@ mod tests {
 
     fn reset() {
         BRIDGE.with_borrow_mut(|b| *b = Bridge::default());
+    }
+
+    #[wasm_bindgen_test]
+    fn exit_calls_the_optional_host_close_callback() {
+        reset();
+        assert!(super::close().is_err());
+        let hooks = js_sys::Object::new();
+        let open = Function::new_no_args("return Promise.resolve(null)");
+        let save = Function::new_no_args("return Promise.resolve()");
+        let close = Function::new_no_args("this.closed = true");
+        Reflect::set(&hooks, &"open".into(), &open).unwrap();
+        Reflect::set(&hooks, &"save".into(), &save).unwrap();
+        set_host_integration(hooks.clone().into()).unwrap();
+        assert!(super::close().is_err());
+        Reflect::set(&hooks, &"close".into(), &close).unwrap();
+        assert!(super::close().is_ok());
+        assert_eq!(Reflect::get(&hooks, &"closed".into()).unwrap(), JsValue::TRUE);
     }
 
     #[wasm_bindgen_test]

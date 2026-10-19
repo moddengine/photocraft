@@ -137,6 +137,17 @@ pub fn guard_window_close(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
+/// Menu exits also need the platform hook: the web backend cannot close an egui viewport.
+pub(crate) fn request_exit(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if app.saving() || app.printing() {
+        app.jobs.close_after_saves = true;
+    } else if let Some(quit) = app.services.quit.as_mut() {
+        quit();
+    } else {
+        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+    }
+}
+
 /// Moves on to the next document, or runs the parked action once none are left.
 fn advance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = app.discard.as_mut() else { return };
@@ -179,7 +190,7 @@ fn advance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(Prompt { id, mut params, target, .. }) = app.discard.take() else { return };
     if id == EXIT {
         app.allow_close = true;
-        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        request_exit(app, ctx);
         return;
     }
     if let Some(target) = target {
@@ -1033,5 +1044,22 @@ mod tests {
         app.allow_close = true;
         assert!(cancels_only(&window_close_commands(&mut app)));
         assert_eq!(quits.get(), 2);
+    }
+
+    #[test]
+    fn file_exit_calls_platform_quit_after_unsaved_work_is_answered() {
+        use std::{cell::Cell, rc::Rc};
+        let quits = Rc::new(Cell::new(0));
+        let counted = quits.clone();
+        let mut app = app_with_docs(1);
+        app.services.quit = Some(Box::new(move || counted.set(counted.get() + 1)));
+        let ctx = egui::Context::default();
+        crate::menus::invoke(&mut app, &ctx, EXIT, Value::Null).unwrap();
+        assert_eq!(quits.get(), 1, "a clean document exits through the host");
+        make_dirty(&mut app, 0);
+        crate::menus::invoke(&mut app, &ctx, EXIT, Value::Null).unwrap();
+        assert_eq!(quits.get(), 1, "dirty work must be confirmed first");
+        advance(&mut app, &ctx);
+        assert_eq!(quits.get(), 2, "confirmed exit reaches the host without a native close event");
     }
 }
