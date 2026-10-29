@@ -1,6 +1,7 @@
 name: ModdEngine web release
 
 on:
+  workflow_dispatch:
   push:
     tags: [moddengine-web-v*]
 

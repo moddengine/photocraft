@@ -40,3 +40,6 @@ web-sys = { version = "0.3", features = ["Window", "MessageEvent", "Document", "
 serde_json = { workspace = true }
 photocraft-paint = { workspace = true }
 photocraft-psd = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
